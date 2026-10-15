@@ -55,9 +55,35 @@ YARN_FACTOR="${YARN_FACTOR:-4.0}"
 # same per-model env file).
 if [ -f "$ENVS" ]; then
   while IFS= read -r line; do
-    case "$line" in ''|\#*) continue ;; esac
+    case "$line" in ''|\\#*) continue ;; esac
     export "$line"
   done < "$ENVS"
+fi
+
+# Parse the tuned CLI `.conf` (paired flag/value tokens) into the runbook
+# vars start.sh consumes, and collect the rest into EXTRA_VLLM_ARGS (which
+# start.sh appends last). The .conf holds the measured recipe (bfloat16 KV,
+# block-256, seqs-4, prefix-caching, cudagraph-48); without this it silently
+# reverts to fp8/seqs-8 and loses prefix-caching + cudagraph.
+: "${EXTRA_VLLM_ARGS:=}"
+if [ -f "$FLAGS_FILE" ]; then
+  mapfile -t _toks < "$FLAGS_FILE"
+  i=0
+  while [ $i -lt ${#_toks[@]} ]; do
+    f="${_toks[$i]}"; i=$((i+1))
+    v=""
+    case "$f" in
+      --kv-cache-dtype)        v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && KV_CACHE_DTYPE="$v";;
+      --max-num-seqs)          v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && MAX_NUM_SEQS="$v";;
+      --max-num-batched-tokens) v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && MAX_NUM_BATCHED_TOKENS="$v";;
+      --max-model-len)         v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && MAX_MODEL_LEN="$v";;
+      --gpu-memory-utilization) v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && GPU_MEMORY_UTILIZATION="$v";;
+      --tensor-parallel-size)  v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && TENSOR_PARALLEL_SIZE="$v";;
+      --block-size)            v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && EXTRA_VLLM_ARGS="$EXTRA_VLLM_ARGS --block-size $v";;
+      --max-cudagraph-capture-size) v="${_toks[$i]:-}"; [ -n "$v" ] && i=$((i+1)) && EXTRA_VLLM_ARGS="$EXTRA_VLLM_ARGS --max-cudagraph-capture-size $v";;
+      --enable-prefix-caching) EXTRA_VLLM_ARGS="$EXTRA_VLLM_ARGS --enable-prefix-caching";;
+    esac
+  done
 fi
 
 cat > "$RUNBOOK/.env" <<EOF
@@ -93,6 +119,7 @@ QSA_PROFILE=$QSA_PROFILE
 REQUIRE_IDLE_GPU=$REQUIRE_IDLE_GPU
 EVICT_PAGE_CACHE=$EVICT_PAGE_CACHE
 VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
+EXTRA_VLLM_ARGS="$EXTRA_VLLM_ARGS"
 NFS_SHARE=false
 EOF
 
