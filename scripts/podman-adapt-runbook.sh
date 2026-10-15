@@ -11,8 +11,8 @@ REPO_URL="${MIAI_RUNBOOK_REPO:-https://github.com/MiaAI-Lab/Qwen3.8-Flash-Next-D
 
 HEAD_IP="${HEAD_IP:-192.168.177.11}"
 WORKER_IP="${WORKER_IP:-192.168.177.12}"
-IFACE="${IFACE:-enp1s0f1np1}"
-IB_HCA="${IB_HCA:-=rocep1s0f1}"
+IFACE="${IFACE:-enp1s0f0np0}"
+IB_HCA="${IB_HCA:-=rocep1s0f0}"
 IB_GID_INDEX="${IB_GID_INDEX:-3}"
 
 if [ ! -d "$RUNBOOK" ]; then
